@@ -41,6 +41,15 @@ import io
 LOG_WIDTH = 100
 TOOL_VERSION = "1.00"
 
+def get_exe_directory():
+    """exe 파일이 있는 디렉토리를 반환"""
+    if getattr(sys, 'frozen', False):
+        # PyInstaller로 실행된 경우
+        return os.path.dirname(sys.executable)
+    else:
+        # 스크립트로 실행된 경우
+        return os.path.dirname(os.path.abspath(__file__))
+
 class ProcessingThread(QThread):
     finished = pyqtSignal()
     log_message = pyqtSignal(str)
@@ -80,7 +89,11 @@ class ProcessingThread(QThread):
                 self.finished.emit()
                 return
             
-            output_folder = os.path.join(self.input_folder, "Output")
+            # 사운드 타입에 따라 폴더 분리
+            if self.sound_type == "Engine Sound":
+                output_folder = os.path.join(get_exe_directory(), "Output", "EngineSound")
+            else:  # Event Sound
+                output_folder = os.path.join(get_exe_directory(), "Output", "EventSound")
             os.makedirs(output_folder, exist_ok=True)
                 
             # WAV → FLAC 변환 및 HEX 변환
@@ -142,13 +155,13 @@ class ProcessingThread(QThread):
                     self.log_message.emit(f"{file_name_formatted} | {start_address:>13} | {data_length:>11}")
                 self.log_message.emit("-" * LOG_WIDTH)
                 
-                # HEX 파일 생성
+                # 파일 생성 (내부적으로만 사용)
                 self.log_message.emit("=" * LOG_WIDTH)
                 self.log_message.emit("[ File Creation ]")
                 self.log_message.emit("=" * LOG_WIDTH)
-                self.merge_hex_data(self.hex_data_list, output_hex_file)
-                self.log_message.emit("\nProcessing completed successfully.")
+                self.merge_hex_data(self.hex_data_list, output_folder)
                 self.save_log.emit()
+                self.log_message.emit("\nProcessing completed successfully.")
                 self.finished.emit()
             
         except Exception as e:
@@ -253,7 +266,7 @@ class ProcessingThread(QThread):
         
         return ih
         
-    def merge_hex_data(self, hex_data_list, output_hex_file, sound_positions=None):
+    def merge_hex_data(self, hex_data_list, output_folder, sound_positions=None):
         ih = IntelHex()
         start_address = int(self.hex_start_address, 16)
         current_address = start_address
@@ -277,6 +290,10 @@ class ProcessingThread(QThread):
                     for _ in range(padding_to_add):
                         ih[current_address] = 0xFF
                         current_address += 1
+                        
+            # Event Sound 모드에서 hex file 사이즈 출력
+            hex_file_size = current_address - start_address
+            self.log_message.emit(f"HEX file size: {hex_file_size:,} bytes ({hex_file_size/1024:.2f} KB)")
                         
         elif self.sound_type == "Engine Sound":
             # Magic key
@@ -319,30 +336,29 @@ class ProcessingThread(QThread):
                 ih[current_address] = 0xFF
                 current_address += 1
                 
-        # HEX 파일 쓰기
-        ih.write_hex_file(output_hex_file, write_start_addr=False)
-        
         if self.sound_type == "Engine Sound":
             # BIN 파일 생성
-            output_bin_file = os.path.splitext(output_hex_file)[0] + '.bin'
+            output_bin_file = os.path.join(output_folder, 'MergedEngineSound.bin')
             with open(output_bin_file, 'wb') as f:
                 for address in range(ih.minaddr(), ih.maxaddr() + 1):
                     f.write(bytes([ih[address]]))
             
-            header_file = os.path.normpath(os.path.join(os.path.dirname(output_hex_file), 'EngineSound_VARIANT.h'))
-            self.save_hex_as_header(output_hex_file, header_file)
+            header_file = os.path.join(output_folder, 'EngineSound_VARIANT.h')
+            self.save_hex_as_header(ih, header_file)
             
             # FLAC 파일들의 총 데이터 크기 출력
             self.log_message.emit(f"Total data size: {total_flac_size:,} bytes")
             
-            self.log_message.emit(f"Created HEX file: {os.path.basename(output_hex_file)}")
             self.log_message.emit(f"Created BIN file: {os.path.basename(output_bin_file)}")
             self.log_message.emit(f"Created HEADER file: {os.path.basename(header_file)}")
-        else:
+        else:  # Event Sound
+            # HEX 파일 생성
+            output_hex_file = os.path.join(output_folder, 'MergedEventSound.hex')
+            ih.write_hex_file(output_hex_file, write_start_addr=False)
+            
             self.log_message.emit(f"Created HEX file: {os.path.basename(output_hex_file)}")
         
-    def save_hex_as_header(self, hex_file, header_file):
-        ih = IntelHex(hex_file)
+    def save_hex_as_header(self, ih, header_file):
         raw_data = bytearray()
         
         for address in range(ih.minaddr(), ih.maxaddr() + 1):
@@ -440,7 +456,7 @@ class SoundInfoDialog(QDialog):
             layout.addWidget(positions_group)
             
         # 확인 버튼
-        done_button = QPushButton("Done")
+        done_button = QPushButton("Apply")
         done_button.clicked.connect(self.accept)
         layout.addWidget(done_button)
         
@@ -546,7 +562,7 @@ class MainWindow(QMainWindow):
         self.input_folder_edit.dragEnterEvent = self.dragEnterEvent
         self.input_folder_edit.dropEvent = self.dropEvent
         
-        self.browse_button = QPushButton("Browse")
+        self.browse_button = QPushButton("Open Folder")
         self.browse_button.clicked.connect(self.browse_folder)
         
         input_layout.addWidget(QLabel("Input Folder:"), 0, 0)
@@ -599,12 +615,9 @@ class MainWindow(QMainWindow):
         address_layout = QGridLayout()
         
         self.start_address_edit = QLineEdit("10118000")
-        self.size_kb_edit = QLineEdit("864.00")
         
         address_layout.addWidget(QLabel("Start Address (Hex):"), 0, 0)
         address_layout.addWidget(self.start_address_edit, 0, 1)
-        address_layout.addWidget(QLabel("HEX File Size (KB):"), 1, 0)
-        address_layout.addWidget(self.size_kb_edit, 1, 1)
         
         address_group.setLayout(address_layout)
         layout.addWidget(address_group)
@@ -629,7 +642,7 @@ class MainWindow(QMainWindow):
         self.processing_thread = ProcessingThread()
         self.processing_thread.log_message.connect(self.append_log)
         self.processing_thread.finished.connect(self.enable_buttons)
-        self.processing_thread.save_log.connect(self.save_log)
+        self.processing_thread.save_log.connect(lambda: self.save_log(auto_save=True))
         self.processing_thread.show_info_dialog.connect(self.show_sound_info_dialog)
         self.processing_thread.no_wav_files.connect(self.handle_no_wav_files)
         
@@ -657,10 +670,10 @@ class MainWindow(QMainWindow):
     def update_fields(self):
         if self.engine_radio.isChecked():
             self.start_address_edit.setText("10118000")
-            self.size_kb_edit.setEnabled(True)
+            self.start_address_edit.setEnabled(False)
         else:
             self.start_address_edit.setText("00001000")
-            self.size_kb_edit.setEnabled(False)
+            self.start_address_edit.setEnabled(True)
             
     def append_log(self, message):
         self.log_text.append(message)
@@ -669,18 +682,16 @@ class MainWindow(QMainWindow):
         self.start_button.setEnabled(True)
         self.save_button.setEnabled(True)
         self.input_folder_edit.setEnabled(True)
-        self.start_address_edit.setEnabled(True)
-        self.size_kb_edit.setEnabled(True)
         self.engine_radio.setEnabled(True)
         self.event_radio.setEnabled(True)
         self.browse_button.setEnabled(True)
+        self.update_fields()
         
     def disable_buttons(self):
         self.start_button.setEnabled(False)
         self.save_button.setEnabled(False)
         self.input_folder_edit.setEnabled(False)
         self.start_address_edit.setEnabled(False)
-        self.size_kb_edit.setEnabled(False)
         self.engine_radio.setEnabled(False)
         self.event_radio.setEnabled(False)
         self.browse_button.setEnabled(False)
@@ -700,28 +711,28 @@ class MainWindow(QMainWindow):
             self.block_size_combo.currentText(),
             "Engine Sound" if self.engine_radio.isChecked() else "Event Sound",
             self.start_address_edit.text(),
-            self.size_kb_edit.text()
+            "864.00"  # 기본값으로 고정
         )
         
         self.processing_thread.start()
         
-    def save_log(self):
-        input_folder = self.input_folder_edit.text()
-        if not input_folder:
-            QMessageBox.warning(self, "Warning", "No input folder selected.")
-            return
-            
-        output_folder = os.path.join(input_folder, "Output")
+    def save_log(self, auto_save=False):
+        # 현재 선택된 사운드 타입에 따라 폴더 분리
+        if self.engine_radio.isChecked():
+            output_folder = os.path.join(get_exe_directory(), "Output", "EngineSound")
+        else:  # Event Sound
+            output_folder = os.path.join(get_exe_directory(), "Output", "EventSound")
         log_folder = os.path.join(output_folder, "log")
         os.makedirs(log_folder, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_filename = f"log_{timestamp}.csv"
+        log_filename = f"{timestamp}_log.csv"
         log_filepath = os.path.join(log_folder, log_filename)
 
         log_content = self.log_text.toPlainText()
         if not log_content:
-            QMessageBox.warning(self, "Warning", "No log content to save.")
+            if not auto_save:  # 수동 저장 시에만 경고 표시
+                QMessageBox.warning(self, "Warning", "No log content to save.")
             return
 
         with open(log_filepath, "w", newline='', encoding="utf-8-sig") as csv_file:
@@ -732,8 +743,13 @@ class MainWindow(QMainWindow):
                     csv_writer.writerow(columns)
                 else:
                     csv_writer.writerow([line])
-                    
-        QMessageBox.information(self, "Success", f"Log has been saved successfully.\nSaved location: {log_filepath}")
+        
+        if auto_save:
+            # 자동 저장 시: 로그창에 파일명 표시, 팝업 없음
+            self.append_log(f"Log saved: {log_filename}")
+        else:
+            # 수동 저장 시: 기존 팝업창 유지, 로그에 메시지 출력하지 않음
+            QMessageBox.information(self, "Success", f"Log has been saved successfully.\nSaved location: {log_filepath}")
 
     def handle_no_wav_files(self):
         QMessageBox.warning(self, "Warning", "No WAV files found in the selected folder.")
@@ -744,24 +760,24 @@ class MainWindow(QMainWindow):
             dialog = SoundInfoDialog(wav_files, start_addresses, sound_positions, self)
             if dialog.exec_() == QDialog.Accepted and not dialog.has_error:
                 # 팝업창이 닫힌 후 HEX 데이터 병합 진행
-                output_folder = os.path.join(self.processing_thread.input_folder, "Output")
+                output_folder = os.path.join(get_exe_directory(), "Output", "EngineSound")
                 output_hex_file = os.path.join(output_folder, "MergedEngineSound.hex")
                 
                 self.append_log("\n" + "=" * LOG_WIDTH)
                 self.append_log("[ File Creation ]")
                 self.append_log("=" * LOG_WIDTH)
                 
-                # 수정된 sound positions 값으로 HEX 데이터 병합
+                # 수정된 sound positions 값으로 데이터 병합
                 self.processing_thread.merge_hex_data(
                     self.processing_thread.hex_data_list,
-                    output_hex_file,
+                    output_folder,
                     dialog.get_sound_positions()
                 )
                 
-                self.append_log("\nProcessing completed successfully.")
-                
                 # HEX 데이터 병합이 완료된 후에 로그 저장
-                self.save_log()
+                self.save_log(auto_save=True)
+                
+                self.append_log("\nProcessing completed successfully.")
                 self.enable_buttons()
         except Exception as e:
             self.append_log(f"Processing failed: {str(e)}")
