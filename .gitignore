@@ -3,3 +3,12 @@
 *.zip
 /build/
 /dist/
+*.pyc
+*.bin
+*.csv
+*.h
+*.md
+*.pptx
+*.ppt
+*.xlsx
+*.json
