@@ -1,10 +1,44 @@
 """
 =========================================================================================
-📌 파일명:      main_window.py
-📌 설명:        AVAS40 WavConverter 메인 윈도우 클래스 (리팩토링됨)
-📌 작성자:      Geunwoo Lee
-📌 작성일:      2025-01-15
-📌 버전:        1.00
+📌 File:         main_window.py
+📌 Description:  Main window class for AVAS40 WavConverter (refactored)
+📌 Author:       Geunwoo Lee
+📌 Date:         2025-01-15
+📌 Version:      1.00
+=========================================================================================
+📌 Main Features:
+    - MainWindow: Main UI window of the application
+    - Input folder selection, conversion settings, sound type selection GUI
+    - Real-time log display and log saving
+    - Drag & drop support, menu bar (settings)
+    - Linked with ProcessingThread for background processing
+    
+📌 MainWindow Key Methods:
+    - _setup_ui(): UI setup (input, settings, type, address, buttons, log)
+    - start_processing(): Start processing and run thread
+    - update_fields(): Update fields by sound type
+    - show_sound_info_dialog(): Show engine address dialog
+    - save_log(): Save log as CSV file
+    - append_log(): Add real-time log message
+    
+📌 UI Structure:
+    - Input Settings: Input folder selection (drag & drop supported)
+    - Conversion Settings: Compression level, block size (disabled)
+    - Sound Type: Engine/Event radio buttons
+    - Address Settings: Start address (auto change by type)
+    - Action buttons: Start Processing, Save Log
+    - Log area: Real-time processing status
+    
+📌 Features:
+    - Engine type: Address "10118000" + disabled
+    - Event type: Address "00001000" + enabled
+    - Drag & drop folder selection
+    - Background processing prevents UI block
+    
+📌 Dependencies:
+    - Standard library: os, csv, datetime
+    - PyQt5: QMainWindow, QWidget, QVBoxLayout, etc.
+    - Local modules: config, utils, processing, dialogs, file_manager
 =========================================================================================
 """
 
@@ -21,56 +55,56 @@ from dialogs import SettingsDialog
 from file_manager import LogManager, OutputPathManager
 
 class MainWindow(QMainWindow):
-    """메인 윈도우 클래스 (리팩토링됨)"""
+    """Main window class (refactored)"""
     
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"AVAS40 Sound Converter v{TOOL_VERSION}")
         self.setGeometry(100, 100, UIConstants.MAIN_WINDOW_WIDTH, UIConstants.MAIN_WINDOW_HEIGHT)
         
-        # 드래그 앤 드롭 활성화
+        # Enable drag and drop
         self.setAcceptDrops(True)
         
-        # 메뉴바 설정
+        # Set up menu bar
         self.setup_menu_bar()
         
-        # UI 구성
+        # Set up UI
         self._setup_ui()
         
-        # 처리 객체들 초기화
+        # Initialize processing objects
         self._init_processing_objects()
         
-        # 초기 상태 설정
+        # Set initial state
         self.update_fields()
         
     def _setup_ui(self):
-        """UI 구성"""
+        """Set up UI"""
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         layout = QVBoxLayout(main_widget)
         
-        # 입력 폴더 선택 그룹
+        # Input folder selection group
         layout.addWidget(self._create_input_group())
         
-        # 설정 그룹
+        # Settings group
         layout.addWidget(self._create_settings_group())
         
-        # 사운드 타입 그룹
+        # Sound type group
         layout.addWidget(self._create_sound_type_group())
         
-        # 주소 설정 그룹
+        # Address settings group
         layout.addWidget(self._create_address_group())
         
-        # 버튼 그룹
+        # Button group
         layout.addLayout(self._create_button_layout())
         
-        # 로그 텍스트 영역
+        # Log text area
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         layout.addWidget(self.log_text)
     
     def _create_input_group(self) -> QGroupBox:
-        """입력 폴더 선택 그룹 생성"""
+        """Create input folder selection group"""
         input_group = QGroupBox("Input Settings")
         input_layout = QGridLayout()
         
@@ -90,21 +124,21 @@ class MainWindow(QMainWindow):
         return input_group
     
     def _create_settings_group(self) -> QGroupBox:
-        """설정 그룹 생성"""
+        """Create settings group"""
         settings_group = QGroupBox("Conversion Settings")
         settings_layout = QGridLayout()
         
-        # 압축 레벨
+        # Compression level
         self.compression_combo = QComboBox()
         self.compression_combo.addItems([str(x) for x in range(11)])
         self.compression_combo.setCurrentText(AudioConstants.DEFAULT_COMPRESSION)
-        self.compression_combo.setEnabled(False)  # 비활성화
+        self.compression_combo.setEnabled(False)  # Disabled
         
-        # 블록 크기
+        # Block size
         self.block_size_combo = QComboBox()
         self.block_size_combo.addItems(["128", "256", "512", "1024", "2048", "4096"])
         self.block_size_combo.setCurrentText(AudioConstants.DEFAULT_BLOCK_SIZE)
-        self.block_size_combo.setEnabled(False)  # 비활성화
+        self.block_size_combo.setEnabled(False)  # Disabled
         
         settings_layout.addWidget(QLabel("Compression:"), 0, 0)
         settings_layout.addWidget(self.compression_combo, 0, 1)
@@ -115,7 +149,7 @@ class MainWindow(QMainWindow):
         return settings_group
     
     def _create_sound_type_group(self) -> QGroupBox:
-        """사운드 타입 그룹 생성"""
+        """Create sound type group"""
         sound_group = QGroupBox("Sound Type")
         sound_layout = QHBoxLayout()
         
@@ -130,7 +164,7 @@ class MainWindow(QMainWindow):
         return sound_group
     
     def _create_address_group(self) -> QGroupBox:
-        """주소 설정 그룹 생성"""
+        """Create address settings group"""
         address_group = QGroupBox("Address Settings")
         address_layout = QGridLayout()
         
@@ -143,7 +177,7 @@ class MainWindow(QMainWindow):
         return address_group
     
     def _create_button_layout(self) -> QHBoxLayout:
-        """버튼 레이아웃 생성"""
+        """Create button layout"""
         button_layout = QHBoxLayout()
         self.start_button = QPushButton("Start Processing")
         self.start_button.clicked.connect(self.start_processing)
@@ -155,8 +189,8 @@ class MainWindow(QMainWindow):
         return button_layout
     
     def _init_processing_objects(self):
-        """처리 객체들 초기화"""
-        # 처리 스레드
+        """Initialize processing objects"""
+        # Processing thread
         self.processing_thread = ProcessingThread()
         self.processing_thread.log_message.connect(self.append_log)
         self.processing_thread.finished.connect(self.enable_buttons)
@@ -164,16 +198,16 @@ class MainWindow(QMainWindow):
         self.processing_thread.show_info_dialog.connect(self.show_sound_info_dialog)
         self.processing_thread.no_wav_files.connect(self.handle_no_wav_files)
         
-        # 로그 매니저는 처리 시작 시 초기화
+        # Log manager is initialized at processing start
         self.log_manager = None
         
     def dragEnterEvent(self, event):
-        """드래그 앤 드롭 이벤트 처리"""
+        """Handle drag and drop event"""
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
     def dropEvent(self, event):
-        """드롭 이벤트 처리"""
+        """Handle drop event"""
         urls = event.mimeData().urls()
         if urls:
             path = urls[0].toLocalFile()
@@ -183,13 +217,13 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Warning", "Please drop a folder, not a file.")
         
     def browse_folder(self):
-        """폴더 선택 다이얼로그"""
+        """Open folder selection dialog"""
         folder = QFileDialog.getExistingDirectory(self, "Select Folder with WAV files")
         if folder:
             self.input_folder_edit.setText(folder)
     
     def setup_menu_bar(self):
-        """메뉴바 설정"""
+        """Set up menu bar"""
         menubar = self.menuBar()
         settings_menu = menubar.addMenu('Settings')
         output_path_action = QAction('Output Path Settings', self)
@@ -197,46 +231,46 @@ class MainWindow(QMainWindow):
         settings_menu.addAction(output_path_action)
 
     def open_settings_dialog(self):
-        """설정 다이얼로그 열기"""
+        """Open settings dialog"""
         dialog = SettingsDialog(self)
         dialog.exec_()
         
     def update_fields(self):
-        """사운드 타입에 따른 필드 업데이트"""
+        """Update fields by sound type"""
         is_engine = self.engine_radio.isChecked()
         
         if is_engine:
-            # Engine 타입: 주소 "10118000" + 비활성화
+            # Engine type: Address "10118000" + disabled
             self.start_address_edit.setText("10118000")
             self.start_address_edit.setEnabled(False)
         else:
-            # Event 타입: 주소 "00001000" + 활성화
+            # Event type: Address "00001000" + enabled
             self.start_address_edit.setText("00001000")
             self.start_address_edit.setEnabled(True)
         
     def start_processing(self):
-        """처리 시작"""
+        """Start processing"""
         if not self._validate_input():
             return
         
-        # 로그 매니저 초기화
+        # Initialize log manager
         sound_type = "Engine Sound" if self.engine_radio.isChecked() else "Event Sound"
         self.log_manager = LogManager(sound_type)
         
-        # UI 비활성화
+        # Disable UI
         self.disable_buttons()
         
-        # 로그 초기화
+        # Clear log
         self.log_text.clear()
         
-        # 처리 매개변수 설정
+        # Set processing parameters
         self._set_processing_parameters()
         
-        # 처리 시작
+        # Start processing
         self.processing_thread.start()
         
     def _validate_input(self) -> bool:
-        """입력 유효성 검사"""
+        """Validate input"""
         input_folder = self.input_folder_edit.text()
         if not input_folder:
             QMessageBox.warning(self, "Warning", "Please select an input folder.")
@@ -246,7 +280,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Warning", "Selected folder does not exist.")
             return False
             
-        # 주소 유효성 검사 (Event Sound인 경우만)
+        # Validate address (only for Event Sound)
         if self.event_radio.isChecked():
             try:
                 int(self.start_address_edit.text(), 16)
@@ -257,13 +291,13 @@ class MainWindow(QMainWindow):
         return True
     
     def _set_processing_parameters(self):
-        """처리 매개변수 설정"""
+        """Set processing parameters"""
         input_folder = self.input_folder_edit.text()
         compression_level = self.compression_combo.currentText()
         block_size = self.block_size_combo.currentText()
         sound_type = "Engine Sound" if self.engine_radio.isChecked() else "Event Sound"
         hex_start_address = self.start_address_edit.text()
-        hex_file_size_kb = "864.00"  # 기본값
+        hex_file_size_kb = "864.00"  # Default value
         
         self.processing_thread.set_parameters(
             input_folder, compression_level, block_size, 
@@ -271,64 +305,64 @@ class MainWindow(QMainWindow):
         )
         
     def disable_buttons(self):
-        """버튼 비활성화"""
+        """Disable buttons"""
         self.start_button.setEnabled(False)
         self.save_button.setEnabled(False)
         
     def enable_buttons(self):
-        """버튼 활성화"""
+        """Enable buttons"""
         self.start_button.setEnabled(True)
         self.save_button.setEnabled(True)
         
     def append_log(self, message):
-        """로그 메시지 추가"""
+        """Add log message"""
         self.log_text.append(message)
-        # 로그 매니저에도 추가
+        # Also add to log manager
         if self.log_manager:
             self.log_manager.add_log_entry(message)
         
     def save_log(self, auto_save=False):
-        """로그 저장"""
+        """Save log"""
         try:
             if not self.log_manager:
                 sound_type = "Engine Sound" if self.engine_radio.isChecked() else "Event Sound"
                 self.log_manager = LogManager(sound_type)
                 
-                # 현재 로그 텍스트를 로그 매니저에 추가
+                # Add current log text to log manager
                 log_content = self.log_text.toPlainText()
                 for line in log_content.split('\n'):
                     if line.strip():
                         self.log_manager.add_log_entry(line.strip())
             
-            # CSV 파일로 저장
+            # Save as CSV file
             log_filename, is_manual = self.log_manager.save_log_to_csv(manual_save=not auto_save)
             
-            if is_manual:  # 수동 저장 시에만 팝업 표시
+            if is_manual:  # Show popup only for manual save
                 QMessageBox.information(self, "Save Complete", f"Log saved as: {log_filename}")
-            else:  # 자동 저장 시 로그창에만 표시 (이미 append_log에서 처리됨)
+            else:  # For auto-save, only show in log (already handled in append_log)
                 pass
                 
         except Exception as e:
             QMessageBox.warning(self, "Save Error", f"Failed to save log: {str(e)}")
         
     def show_sound_info_dialog(self, wav_files, start_addresses, sound_positions):
-        """사운드 정보 다이얼로그 표시 (엔진 사운드만)"""
+        """Show sound info dialog (engine sound only)"""
         dialog = AddressSettingDialog(wav_files, start_addresses, sound_positions, self)
         result = dialog.exec_()
         
         if result == QDialog.Accepted:
-            # 다이얼로그가 정상적으로 닫혔을 때의 처리
+            # When dialog is closed normally
             updated_positions = dialog.get_sound_positions()
             self._log_engine_sound_positions(wav_files, start_addresses, updated_positions)
             
-            # ProcessingThread에서 엔진 처리 완료 계속 진행
+            # Continue engine processing in ProcessingThread
             self.processing_thread.complete_engine_processing(updated_positions)
         else:
-            # 다이얼로그가 취소된 경우 스레드 종료
+            # If dialog is cancelled, finish thread
             self.processing_thread.finished.emit()
     
     def _log_engine_sound_positions(self, wav_files, start_addresses, sound_positions):
-        """엔진 사운드 포지션 정보를 로그에 출력"""
+        """Output engine sound position info to log"""
         self.append_log("\n" + "< Engine Sound Position Information >")
         self.append_log("-" * LOG_WIDTH)
         self.append_log(f"{'Position'.center(20)}|{'Wave File'.center(60)}")
@@ -343,7 +377,7 @@ class MainWindow(QMainWindow):
         
         for i, (label, position) in enumerate(zip(position_labels, sound_positions)):
             if position.upper() != "FFFFFFFF":
-                # 매칭되는 WAV 파일 찾기
+                # Find matching WAV file for this address
                 position_addr = int(position, 16)
                 wave_file = "Not found"
                 for j, start_addr in enumerate(start_addresses):
@@ -358,6 +392,6 @@ class MainWindow(QMainWindow):
         self.append_log("-" * LOG_WIDTH)
         
     def handle_no_wav_files(self):
-        """WAV 파일이 없을 때 처리"""
+        """Handle case when no WAV files are found"""
         QMessageBox.warning(self, "No WAV Files", "No WAV files found in the selected folder.")
         self.enable_buttons() 

@@ -1,36 +1,42 @@
 #!/usr/bin/env python3
 """
 =========================================================================================
-📌 파일명:      AVAS40_Sound Convertor.py
-📌 설명:        AVAS40 WAV to Binary Converter - 모듈화된 메인 진입점
-📌 작성자:      Geunwoo Lee
-📌 작성일:      2025-01-15 (모듈화 업데이트)
-📌 버전:        1.00
+📌 File:         AVAS40_Sound_Converter.py
+📌 Description:  Compatibility entry point for AVAS40 WAV to Binary Converter
+📌 Author:       Geunwoo Lee
+📌 Date:         2025-01-15 (modularization update)
+📌 Version:      1.00
 =========================================================================================
-📌 변경 이력
------------------------------------------------------------------------------------------
-날짜          | 작성자        | 버전   | 변경 내용
------------------------------------------------------------------------------------------
-2025-05-29   | Geunwoo Lee   | 1.00  | 최초 작성
-2025-01-15   | Geunwoo Lee   | 1.00  | 모듈화 구조로 리팩터링
-
-=========================================================================================
-📌 사용 방법:
-    - 배포 메뉴얼 참조
-    - python AVAS40_Sound Convertor.py 또는 python main.py로 실행 가능
-=========================================================================================
-📌 의존성:
+📌 Main Features:
+    - Maintains compatibility with legacy filename (AVAS40_WavConverter.py → AVAS40_Sound_Converter.py)
+    - Provides same functionality as main.py
+    - Imports all modules for full feature access
+    - Compatibility interface for legacy users
+    
+📌 Change Log:
+    - 2025-05-29: Initial creation (monolithic structure)
+    - 2025-01-15: Refactored to modular structure
+    
+📌 How to Run:
+    - Direct: python AVAS40_Sound_Converter.py
+    - Recommended: python main.py
+    - All legacy features available
+    
+📌 Dependencies:
     - Python ver 3.12.3
-    - 필수 추가 파일 : flac.exe, libFLAC.dll
     - PyQt5
-=========================================================================================
-📌 모듈 구조:
-    - utils.py: 상수와 유틸리티 함수
-    - config.py: 설정 관리
-    - processing.py: 프로세싱 스레드와 주소 설정 다이얼로그
-    - dialogs.py: 설정 다이얼로그
-    - main_window.py: 메인 윈도우 클래스
-    - main.py: 메인 실행 파일
+    - Required external files: flac.exe, libFLAC.dll
+    - All local modules (utils, config, processing, dialogs, main_window, main)
+    
+📌 Module Structure:
+    - utils.py: Constants, utility functions, exception classes
+    - config.py: JSON-based settings management
+    - audio_processor.py: WAV/FLAC conversion and HEX data generation
+    - file_manager.py: File/log saving and path management
+    - processing.py: Background processing thread and address dialog
+    - dialogs.py: Output path settings dialog
+    - main_window.py: Main UI window
+    - main.py: Actual entry point (recommended)
 =========================================================================================
 """
 

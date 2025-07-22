@@ -1,10 +1,40 @@
 """
 =========================================================================================
-📌 파일명:      processing.py  
-📌 설명:        AVAS40 WavConverter 프로세싱 스레드와 관련 다이얼로그
-📌 작성자:      Geunwoo Lee
-📌 작성일:      2025-01-15
-📌 버전:        1.00
+📌 File:         processing.py
+📌 Description:  Processing thread and address dialog for AVAS40 WavConverter
+📌 Author:       Geunwoo Lee
+📌 Date:         2025-01-15
+📌 Version:      1.00
+=========================================================================================
+📌 Main Features:
+    - ProcessingThread: Background audio processing thread
+    - AddressSettingDialog: Engine sound address setting dialog
+    - Manages full process: WAV → FLAC → HEX → merge → file save
+    - Branches flow by sound type (Engine vs Event)
+    
+📌 ProcessingThread Key Methods:
+    - run(): Main processing logic (WAV validation → conversion → merge → save)
+    - _convert_wav_files(): Convert WAV files to FLAC and then to HEX
+    - _merge_and_save_files(): Merge HEX data and save files
+    - _show_engine_address_dialog(): Show engine address dialog
+    - complete_engine_processing(): Complete engine sound processing
+    - _finalize_processing(): Finalize and cleanup
+    
+📌 AddressSettingDialog Key Features:
+    - Table of start addresses for each WAV file
+    - 10 engine sound positions (F1-F3, S1-S3, C1-C2, R1-R2)
+    - Address validation and matching
+    - Hexadecimal input validation
+    
+📌 Processing Flow:
+    Engine Sound: WAV→Dialog→User setting→Merge/Save
+    Event Sound: WAV→File info log→Merge/Save
+    
+📌 Dependencies:
+    - Standard library: os
+    - PyQt5: QDialog, QThread, QTableWidget, etc.
+    - External library: intelhex
+    - Local modules: utils, audio_processor, file_manager
 =========================================================================================
 """
 
@@ -21,7 +51,7 @@ from audio_processor import AudioProcessor, HexMerger
 from file_manager import FileManager, LogManager
 
 class ProcessingThread(QThread):
-    """오디오 파일 처리 스레드 (리팩토링된 버전)"""
+    """Audio file processing thread (refactored version)"""
     
     finished = pyqtSignal()
     log_message = pyqtSignal(str)
@@ -34,7 +64,7 @@ class ProcessingThread(QThread):
         self._init_parameters()
         
     def _init_parameters(self):
-        """매개변수 초기화"""
+        """Initialize parameters"""
         self.input_folder = ""
         self.compression_level = AudioConstants.DEFAULT_COMPRESSION
         self.block_size = AudioConstants.DEFAULT_BLOCK_SIZE
@@ -42,19 +72,19 @@ class ProcessingThread(QThread):
         self.hex_start_address = AudioConstants.DEFAULT_START_ADDRESS
         self.hex_file_size_kb = "864.00"
         
-        # 처리 결과 데이터
+        # Processing result data
         self.hex_data_list = []
         self.wav_files = []
         self.start_addresses = []
         
-        # 처리 객체들
+        # Processing objects
         self.audio_processor = None
         self.hex_merger = None
         self.file_manager = None
         self.log_manager = None
         
     def set_parameters(self, input_folder, compression_level, block_size, sound_type, hex_start_address, hex_file_size_kb):
-        """처리 매개변수 설정"""
+        """Set processing parameters"""
         self.input_folder = input_folder
         self.compression_level = compression_level
         self.block_size = block_size
@@ -62,44 +92,44 @@ class ProcessingThread(QThread):
         self.hex_start_address = hex_start_address
         self.hex_file_size_kb = hex_file_size_kb
         
-        # 처리 객체들 초기화
+        # Initialize processing objects
         self._init_processors()
         
     def _init_processors(self):
-        """처리 객체들 초기화"""
+        """Initialize processing objects"""
         self.audio_processor = AudioProcessor(self.compression_level, self.block_size)
         self.hex_merger = HexMerger(self.sound_type, self.hex_start_address)
         self.file_manager = FileManager(self.sound_type)
         self.log_manager = LogManager(self.sound_type)
         
     def run(self):
-        """메인 처리 로직"""
+        """Main processing logic"""
         try:
             self.log_message.emit("Starting processing")
             self.log_manager.add_log_entry("Processing started")
             
-            # 1. WAV 파일 검색 및 검증
+            # 1. Find and validate WAV files
             if not self._find_and_validate_wav_files():
                 return
             
-            # 2. 출력 폴더 준비
+            # 2. Prepare output folder
             if not self._prepare_output_folder():
                 return
             
-            # 3. WAV → FLAC → HEX 변환
+            # 3. Convert WAV → FLAC → HEX
             if not self._convert_wav_files():
                 return
             
-            # 3.5. 파일 정보 로그 출력 (이벤트 사운드만)
+            # 3.5. Output file info log (Event Sound only)
             if self.sound_type == "Event Sound":
                 self._log_file_info()
             
-            # 4. 사운드 타입별 처리 분기
+            # 4. Branch by sound type
             if self.sound_type == "Engine Sound":
-                # 엔진 사운드: AddressSettingDialog 표시 후 처리 계속
+                # Engine sound: show AddressSettingDialog, then continue
                 self._show_engine_address_dialog()
             else:
-                # 이벤트 사운드: 바로 병합/저장 진행
+                # Event sound: merge/save immediately
                 if not self._merge_and_save_files():
                     return
                 self._finalize_processing()
@@ -108,10 +138,10 @@ class ProcessingThread(QThread):
             error_msg = f"Error in processing thread: {str(e)}"
             self.log_message.emit(error_msg)
             self.log_manager.add_log_entry(f"Error: {str(e)}")
-            self.finished.emit()  # 에러 시에도 finished 시그널 발생
+            self.finished.emit()  # Emit finished signal even on error
             
     def _find_and_validate_wav_files(self) -> bool:
-        """WAV 파일 검색 및 검증"""
+        """Find and validate WAV files"""
         try:
             if not os.path.exists(self.input_folder):
                 raise ProcessingError(f"Input folder does not exist: {self.input_folder}")
@@ -132,7 +162,7 @@ class ProcessingThread(QThread):
             return False
     
     def _prepare_output_folder(self) -> bool:
-        """출력 폴더 준비"""
+        """Prepare output folder"""
         try:
             output_folder = self.file_manager.ensure_output_folder_exists()
             self.log_message.emit(f"Output folder ready: {os.path.basename(output_folder)}")
@@ -145,7 +175,7 @@ class ProcessingThread(QThread):
             return False
     
     def _convert_wav_files(self) -> bool:
-        """WAV 파일들을 FLAC을 거쳐 HEX 데이터로 변환"""
+        """Convert WAV files to FLAC and then to HEX data"""
         try:
             self.log_message.emit("\n" + "=" * LOG_WIDTH)
             self.log_message.emit("[ File Conversion ]")
@@ -154,16 +184,16 @@ class ProcessingThread(QThread):
             self.hex_data_list = []
             self.start_addresses = []
             
-            # 시작 주소 계산
+            # Calculate initial address
             base_address = int(self.hex_start_address, 16)
             current_address = self._calculate_initial_address(base_address)
             
-            # 각 WAV 파일 처리
+            # Process each WAV file
             for wav_file in self.wav_files:
                 if not self._process_single_wav_file(wav_file, current_address):
                     return False
                     
-                # 다음 파일을 위한 주소 계산
+                # Calculate address for next file
                 if self.hex_data_list:
                     hex_data = self.hex_data_list[-1]
                     current_address += len(hex_data)
@@ -177,28 +207,28 @@ class ProcessingThread(QThread):
             return False
     
     def _calculate_initial_address(self, base_address: int) -> int:
-        """초기 주소 계산"""
+        """Calculate initial address"""
         if self.sound_type == "Engine Sound":
             return base_address + AudioConstants.ENGINE_HEADER_SIZE
         else:  # Event Sound
             return base_address + AudioConstants.EVENT_HEADER_SIZE
     
     def _process_single_wav_file(self, wav_file: str, current_address: int) -> bool:
-        """단일 WAV 파일 처리"""
+        """Process a single WAV file"""
         wav_file_path = os.path.join(self.input_folder, wav_file)
         
         try:
-            # WAV → FLAC 변환
+            # WAV → FLAC conversion
             flac_data = self.audio_processor.wav_to_flac(wav_file_path)
             
-            # FLAC → HEX 데이터 변환
+            # FLAC → HEX data conversion
             hex_data = self.audio_processor.create_hex_data(flac_data, self.sound_type, wav_file)
             
-            # 결과 저장
+            # Save result
             self.hex_data_list.append(hex_data)
             self.start_addresses.append(current_address)
             
-            # 로그 메시지
+            # Log message
             self.log_message.emit(f"Converted successfully : {wav_file}")
             self.log_manager.add_log_entry(f"Converted: {wav_file}")
             
@@ -214,13 +244,13 @@ class ProcessingThread(QThread):
             return False
     
     def _align_address(self, address: int) -> int:
-        """주소를 4바이트 경계로 정렬"""
+        """Align address to 4-byte boundary"""
         if address % AudioConstants.WORD_ALIGNMENT != 0:
             address += AudioConstants.WORD_ALIGNMENT - (address % AudioConstants.WORD_ALIGNMENT)
         return address
     
     def _log_file_info(self):
-        """파일 정보 테이블 로그 출력"""
+        """Output file info table to log"""
         try:
             self.log_message.emit("\n" + "-" * LOG_WIDTH)
             self.log_message.emit(f"{'File Name':<50} | {'Start Address':>13} | {'Data Length':>11}")
@@ -228,7 +258,7 @@ class ProcessingThread(QThread):
             
             for i, (wav_file, start_addr, hex_data) in enumerate(zip(self.wav_files, self.start_addresses, self.hex_data_list)):
                 file_name = os.path.basename(wav_file)
-                # 파일명이 너무 길면 자르고 "..." 추가
+                # If file name is too long, truncate and add "..."
                 if len(file_name) > 47:
                     file_name = file_name[:44] + "..."
                 file_name_formatted = f"{file_name:<50}"
@@ -242,19 +272,19 @@ class ProcessingThread(QThread):
             self.log_message.emit(f"Error logging file info: {str(e)}")
     
     def _merge_and_save_files(self) -> bool:
-        """HEX 데이터 병합 및 파일 저장"""
+        """Merge HEX data and save files"""
         try:
             self.log_message.emit("\n" + "=" * LOG_WIDTH)
             self.log_message.emit("[ File Generation ]")
             self.log_message.emit("=" * LOG_WIDTH)
             
-            # 사운드 포지션 처리 (엔진 사운드만)
+            # Process sound positions (engine sound only)
             sound_positions = self._get_sound_positions()
             
-            # HEX 데이터 병합
+            # Merge HEX data
             merged_hex = self.hex_merger.merge_hex_data_list(self.hex_data_list, sound_positions)
             
-            # 파일 저장
+            # Save files
             return self._save_output_files(merged_hex)
             
         except Exception as e:
@@ -263,13 +293,13 @@ class ProcessingThread(QThread):
             return False
     
     def _get_sound_positions(self) -> list:
-        """사운드 포지션 가져오기 (엔진 사운드 전용)"""
+        """Get sound positions (engine sound only)"""
         if self.sound_type == "Engine Sound":
             return [hex(addr)[2:].upper().zfill(8) for addr in self.start_addresses]
         return None
     
     def _save_output_files(self, merged_hex: IntelHex) -> bool:
-        """출력 파일들 저장"""
+        """Save output files"""
         try:
             if self.sound_type == "Engine Sound":
                 return self._save_engine_files(merged_hex)
@@ -282,22 +312,22 @@ class ProcessingThread(QThread):
             return False
     
     def _save_engine_files(self, merged_hex: IntelHex) -> bool:
-        """엔진 사운드 파일들 저장"""
+        """Save engine sound files"""
         try:
-            # FLAC 파일들의 총 데이터 크기 계산
+            # Calculate total FLAC data size
             total_flac_size = 0
             for temp_ih in self.hex_data_list:
-                # FLAC 데이터 크기 계산 (헤더 4바이트 제외)
+                # Calculate FLAC data size (excluding 4-byte header)
                 flac_size = (temp_ih[0x0000] | (temp_ih[0x0001] << 8) | (temp_ih[0x0002] << 16) | (temp_ih[0x0003] << 24))
                 total_flac_size += flac_size
             
-            # BIN 파일 저장
+            # Save BIN file
             bin_filename = self.file_manager.save_bin_file(merged_hex)
             self.log_message.emit(f"Total data size: {total_flac_size:,} bytes")
             self.log_message.emit(f"Created BIN file: {bin_filename}")
             self.log_manager.add_log_entry(f"Created BIN: {bin_filename}")
             
-            # 헤더 파일 저장
+            # Save header file
             header_filename = self.file_manager.save_header_file(merged_hex)
             self.log_message.emit(f"Created header file: {header_filename}")
             self.log_manager.add_log_entry(f"Created header: {header_filename}")
@@ -309,17 +339,17 @@ class ProcessingThread(QThread):
             return False
     
     def _save_event_files(self, merged_hex: IntelHex) -> bool:
-        """이벤트 사운드 파일들 저장"""
+        """Save event sound files"""
         try:
-            # HEX 파일 저장
+            # Save HEX file
             hex_filename = self.file_manager.save_hex_file(merged_hex)
             
-            # HEX 파일 크기 출력 (먼저)
+            # Output HEX file size (first)
             hex_file_size = merged_hex.maxaddr() - merged_hex.minaddr() + 1
             self.log_message.emit(f"HEX file size: {hex_file_size:,} bytes ({hex_file_size/1024:.2f} KB)")
             self.log_manager.add_log_entry(f"HEX size: {hex_file_size} bytes")
             
-            # 생성 파일명 출력 (나중)
+            # Output created file name (after)
             self.log_message.emit(f"Created HEX file: {hex_filename}")
             self.log_manager.add_log_entry(f"Created HEX: {hex_filename}")
             
@@ -330,9 +360,9 @@ class ProcessingThread(QThread):
             return False
     
     def _show_engine_address_dialog(self):
-        """엔진 사운드용 주소 설정 다이얼로그 표시"""
+        """Show address setting dialog for engine sound"""
         try:
-            # 기본 사운드 포지션 (10개 슬롯, 모두 FFFFFFFF로 초기화)
+            # Default sound positions (10 slots, all FFFFFFFF)
             sound_positions = ["FFFFFFFF"] * 10
             self.show_info_dialog.emit(self.wav_files, self.start_addresses, sound_positions)
         except Exception as e:
@@ -340,16 +370,16 @@ class ProcessingThread(QThread):
             self.finished.emit()
     
     def complete_engine_processing(self, updated_positions):
-        """엔진 사운드 처리 완료 (AddressSettingDialog에서 호출됨)"""
+        """Complete engine sound processing (called from AddressSettingDialog)"""
         try:
             self.log_message.emit("\n" + "=" * LOG_WIDTH)
             self.log_message.emit("[ File Generation ]")
             self.log_message.emit("=" * LOG_WIDTH)
             
-            # 업데이트된 포지션으로 병합
+            # Merge with updated positions
             merged_hex = self.hex_merger.merge_hex_data_list(self.hex_data_list, updated_positions)
             
-            # 파일 저장
+            # Save files
             if self._save_engine_files(merged_hex):
                 self._finalize_processing()
             else:
@@ -360,19 +390,19 @@ class ProcessingThread(QThread):
             self.finished.emit()
 
     def _finalize_processing(self):
-        """처리 완료 및 정리"""
+        """Finalize and cleanup"""
         try:
-            # 로그 자동 저장
+            # Auto-save log
             log_filename, _ = self.log_manager.save_log_to_csv(manual_save=False)
             self.log_message.emit(f"Log saved: {log_filename}")
             
-            # 완료 메시지
+            # Completion message
             self.log_message.emit("\nProcessing completed successfully")
             
-            # 자동 로그 저장 시그널
+            # Auto-save log signal
             self.save_log.emit()
             
-            # 스레드 완료
+            # Thread finished
             self.finished.emit()
             
         except Exception as e:
@@ -380,7 +410,7 @@ class ProcessingThread(QThread):
             self.finished.emit()
 
 class AddressSettingDialog(QDialog):
-    """주소 설정 다이얼로그 (기존 기능 유지)"""
+    """Address setting dialog (legacy feature maintained)"""
     
     def __init__(self, wav_files, start_addresses, sound_positions, parent=None):
         super().__init__(parent)
@@ -393,57 +423,57 @@ class AddressSettingDialog(QDialog):
         self._setup_ui()
         
     def _setup_ui(self):
-        """UI 구성"""
-        # 창 크기를 WAV 파일 수에 따라 동적으로 조정
+        """UI setup"""
+        # Dynamically adjust window size based on number of WAV files
         base_height = 100
         row_height = 40
-        table_height = len(self.wav_files) * row_height + 30  # 헤더 높이 포함
-        # 테이블 너비에 맞춰 창 크기 조정 (여백 포함)
+        table_height = len(self.wav_files) * row_height + 30  # Include header height
+        # Adjust window width to fit table (including margin)
         dialog_width = UIConstants.WAV_FILE_COLUMN_WIDTH + UIConstants.ADDRESS_COLUMN_WIDTH + 50
         self.setGeometry(150, 150, dialog_width, base_height + table_height)
         
         layout = QVBoxLayout()
         
-        # 설명 레이블
+        # Description label
         desc_label = QLabel("Set the starting address for each sound file:")
         layout.addWidget(desc_label)
         
-        # 테이블 생성
+        # Create table
         table = QTableWidget()
         table.setColumnCount(2)
         table.setRowCount(len(self.wav_files))
         table.setHorizontalHeaderLabels(["WAV File", "Start Address"])
         
-        # 컬럼 너비 설정
+        # Set column widths
         table.setColumnWidth(0, UIConstants.WAV_FILE_COLUMN_WIDTH)
         table.setColumnWidth(1, UIConstants.ADDRESS_COLUMN_WIDTH)
         
-        # 테이블 크기 정책 설정 - 수평 스크롤바 제거
+        # Set table size policy - remove horizontal scrollbar
         table.horizontalHeader().setStretchLastSection(False)
         table.setHorizontalScrollBarPolicy(1)  # ScrollBarAlwaysOff
         
-        # 테이블 높이 설정
+        # Set table height
         table.setFixedHeight(table_height)
-        # 테이블 너비를 컬럼 너비에 맞춰 고정
+        # Fix table width to column widths
         table.setFixedWidth(UIConstants.WAV_FILE_COLUMN_WIDTH + UIConstants.ADDRESS_COLUMN_WIDTH + UIConstants.TABLE_MARGIN)
         
-        self.start_address_items = []  # Start Address 아이템 저장
+        self.start_address_items = []  # Store Start Address items
         
-        # 각 행에 데이터 채우기
+        # Fill data for each row
         for i, (wav_file, start_addr) in enumerate(zip(self.wav_files, self.start_addresses)):
-            # WAV 파일명
+            # WAV file name
             file_item = QTableWidgetItem(wav_file)
-            file_item.setFlags(file_item.flags() & ~Qt.ItemIsEditable)  # 편집 불가
+            file_item.setFlags(file_item.flags() & ~Qt.ItemIsEditable)  # Not editable
             table.setItem(i, 0, file_item)
             
-            # 시작 주소 (편집 가능)
+            # Start address (editable)
             addr_item = QTableWidgetItem(hex(start_addr)[2:].upper().zfill(8))
             table.setItem(i, 1, addr_item)
             self.start_address_items.append(addr_item)
         
         layout.addWidget(table)
         
-        # Engine Sound Positions 정보
+        # Engine Sound Positions info
         if self.sound_positions:
             positions_group = QGroupBox("Engine Sound Positions")
             positions_layout = QGridLayout()
@@ -455,12 +485,12 @@ class AddressSettingDialog(QDialog):
                 "Sound R1 position:", "Sound R2 position:"
             ]
             
-            self.position_edits = []  # 수정된 포지션 값을 저장할 리스트
+            self.position_edits = []  # List to store edited positions
             for i, (label_text, position) in enumerate(zip(position_labels, self.sound_positions)):
                 label = QLabel(label_text)
                 edit = QLineEdit(position)
-                edit.setMaxLength(8)  # 8자리 16진수
-                edit.setValidator(QRegExpValidator(QRegExp("[0-9A-Fa-f]{8}")))  # 16진수만 입력 가능
+                edit.setMaxLength(8)  # 8-digit hex
+                edit.setValidator(QRegExpValidator(QRegExp("[0-9A-Fa-f]{8}")))  # Only hex allowed
                 self.position_edits.append(edit)
                 positions_layout.addWidget(label, i, 0)
                 positions_layout.addWidget(edit, i, 1)
@@ -468,7 +498,7 @@ class AddressSettingDialog(QDialog):
             positions_group.setLayout(positions_layout)
             layout.addWidget(positions_group)
         
-        # Apply 버튼
+        # Apply button
         apply_button = QPushButton("Apply")
         apply_button.clicked.connect(self.accept)
         layout.addWidget(apply_button)
@@ -476,17 +506,17 @@ class AddressSettingDialog(QDialog):
         self.setLayout(layout)
     
     def get_sound_positions(self):
-        """사운드 포지션 가져오기"""
+        """Get sound positions"""
         return [edit.text().upper() for edit in self.position_edits] if hasattr(self, 'position_edits') else []
     
     def accept(self):
-        """확인 버튼 클릭 시"""
-        # Engine Sound Position 정보를 로그창에 출력
+        """On Apply button click"""
+        # Output Engine Sound Position info to log
         if hasattr(self, 'position_edits'):
-            # address 매치 검사를 위한 리스트
+            # List for address matching check
             unmatched_positions = []
             
-            # 포지션 레이블과 값 출력
+            # Output position labels and values
             position_labels = [
                 "Sound F1 ", "Sound F2 ", "Sound F3 ",
                 "Sound S1 ", "Sound S2 ", "Sound S3 ",
@@ -497,10 +527,10 @@ class AddressSettingDialog(QDialog):
             for i, (label, edit) in enumerate(zip(position_labels, self.position_edits)):
                 position_value = edit.text().upper()
                 if position_value != "FFFFFFFF":
-                    # 입력된 주소를 16진수로 변환
+                    # Convert input address to hex
                     try:
                         position_addr = int(position_value, 16)
-                        # 해당 주소에 매칭되는 WAV 파일 찾기
+                        # Find matching WAV file for this address
                         wave_file = "Not found"
                         for j, start_addr in enumerate(self.start_addresses):
                             if start_addr == position_addr:
@@ -512,18 +542,18 @@ class AddressSettingDialog(QDialog):
                         wave_file = "Invalid address"
                         unmatched_positions.append(label.strip())
             
-            # 매치되지 않은 position이 있는 경우 에러 메시지 표시
+            # If there are unmatched positions, show error message
             if unmatched_positions:
                 error_msg = "Error: The following positions have unmatched addresses:\n"
                 for pos in unmatched_positions:
                     error_msg += f"- {pos}\n"
                 error_msg += "\nPlease check the addresses and try again."
                 QMessageBox.critical(self, "Error", error_msg)
-                return  # 처리를 중단하고 다이얼로그를 닫지 않음
+                return  # Do not close dialog, stop processing
         
         self.sound_positions = self.get_sound_positions()
         super().accept()
     
     def closeEvent(self, event):
-        """창 닫기 이벤트"""
+        """On dialog close event"""
         event.accept() 
