@@ -180,9 +180,9 @@ class LogManager:
             # Check/create output folder
             output_folder = self.file_manager.ensure_output_folder_exists()
             
-            # Generate log filename (YYYYMMDD_HHMMSS_log.csv)
+            # Generate log filename (YYYYMMDD_HHMMSS_SoundConverter_log.csv)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            log_filename = f"{timestamp}_log.csv"
+            log_filename = f"{timestamp}_SoundConverter_log.csv"
             log_filepath = os.path.join(output_folder, log_filename)
             
             # Save as CSV file

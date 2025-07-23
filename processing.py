@@ -41,7 +41,7 @@
 import os
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QGroupBox, 
                             QTableWidget, QTableWidgetItem, QLabel, QLineEdit, 
-                            QPushButton, QMessageBox)
+                            QPushButton, QMessageBox, QSizePolicy)
 from PyQt5.QtCore import QThread, pyqtSignal, QRegExp, Qt
 from PyQt5.QtGui import QRegExpValidator
 from intelhex import IntelHex
@@ -424,19 +424,22 @@ class AddressSettingDialog(QDialog):
         
     def _setup_ui(self):
         """UI setup"""
-        # Dynamically adjust window size based on number of WAV files
-        base_height = 100
-        row_height = 40
-        table_height = len(self.wav_files) * row_height + 30  # Include header height
-        # Adjust window width to fit table (including margin)
-        dialog_width = UIConstants.WAV_FILE_COLUMN_WIDTH + UIConstants.ADDRESS_COLUMN_WIDTH + 50
-        self.setGeometry(150, 150, dialog_width, base_height + table_height)
-        
+        # 창의 폭을 완전히 고정
+        fixed_width = UIConstants.WAV_FILE_COLUMN_WIDTH + UIConstants.ADDRESS_COLUMN_WIDTH + 50
+        self.setFixedWidth(fixed_width)
+        # self.setMinimumWidth(fixed_width)  # 제거
+        # self.setMaximumWidth(fixed_width)  # 제거
+
         layout = QVBoxLayout()
+        
+        # 라벨 고정폭 및 다이얼로그 최소폭 설정
+        fixed_label_width = 350
+        self.setMinimumWidth(fixed_label_width + 30)  # 라벨+여유
         
         # Description label
         desc_label = QLabel("Set the starting address for each sound file:")
-        layout.addWidget(desc_label)
+        desc_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        layout.addWidget(desc_label, 0)
         
         # Create table
         table = QTableWidget()
@@ -448,14 +451,10 @@ class AddressSettingDialog(QDialog):
         table.setColumnWidth(0, UIConstants.WAV_FILE_COLUMN_WIDTH)
         table.setColumnWidth(1, UIConstants.ADDRESS_COLUMN_WIDTH)
         
-        # Set table size policy - remove horizontal scrollbar
+        # Set table size policy - allow expanding vertically only
+        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         table.horizontalHeader().setStretchLastSection(False)
         table.setHorizontalScrollBarPolicy(1)  # ScrollBarAlwaysOff
-        
-        # Set table height
-        table.setFixedHeight(table_height)
-        # Fix table width to column widths
-        table.setFixedWidth(UIConstants.WAV_FILE_COLUMN_WIDTH + UIConstants.ADDRESS_COLUMN_WIDTH + UIConstants.TABLE_MARGIN)
         
         self.start_address_items = []  # Store Start Address items
         
@@ -471,12 +470,13 @@ class AddressSettingDialog(QDialog):
             table.setItem(i, 1, addr_item)
             self.start_address_items.append(addr_item)
         
-        layout.addWidget(table)
+        layout.addWidget(table, 1)  # stretch=1로 추가
         
         # Engine Sound Positions info
         if self.sound_positions:
             positions_group = QGroupBox("Engine Sound Positions")
             positions_layout = QGridLayout()
+            positions_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
             
             position_labels = [
                 "Sound F1 position:", "Sound F2 position:", "Sound F3 position:",
@@ -494,14 +494,15 @@ class AddressSettingDialog(QDialog):
                 self.position_edits.append(edit)
                 positions_layout.addWidget(label, i, 0)
                 positions_layout.addWidget(edit, i, 1)
-                
+            
             positions_group.setLayout(positions_layout)
-            layout.addWidget(positions_group)
+            layout.addWidget(positions_group, 0)  # stretch=0
         
         # Apply button
         apply_button = QPushButton("Apply")
+        apply_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         apply_button.clicked.connect(self.accept)
-        layout.addWidget(apply_button)
+        layout.addWidget(apply_button, 0)  # stretch=0
         
         self.setLayout(layout)
     
@@ -554,6 +555,8 @@ class AddressSettingDialog(QDialog):
         self.sound_positions = self.get_sound_positions()
         super().accept()
     
-    def closeEvent(self, event):
-        """On dialog close event"""
-        event.accept() 
+    def resizeEvent(self, event):
+        fixed_width = UIConstants.WAV_FILE_COLUMN_WIDTH + UIConstants.ADDRESS_COLUMN_WIDTH + 50
+        if self.width() != fixed_width:
+            self.resize(fixed_width, self.height())
+        super().resizeEvent(event) 
