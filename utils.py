@@ -1,7 +1,7 @@
 """
 =========================================================================================
 📌 File:         utils.py
-📌 Description:  Utility functions, constants, and exception classes for AVAS40 WavConverter
+📌 Description:  Utility functions, constants, and exception classes for AVAS40 WavGenerator
 📌 Author:       Geunwoo Lee
 📌 Date:         2025-01-15
 📌 Version:      1.00

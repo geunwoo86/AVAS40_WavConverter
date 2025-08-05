@@ -1,7 +1,7 @@
 """
 =========================================================================================
 📌 File:         processing.py
-📌 Description:  Processing thread and address dialog for AVAS40 WavConverter
+📌 Description:  Processing thread and address dialog for AVAS40 WavGenerator
 📌 Author:       Geunwoo Lee
 📌 Date:         2025-01-15
 📌 Version:      1.00
@@ -120,9 +120,8 @@ class ProcessingThread(QThread):
             if not self._convert_wav_files():
                 return
             
-            # 3.5. Output file info log (Event Sound only)
-            if self.sound_type == "Event Sound":
-                self._log_file_info()
+            # 3.5. Output file info log (both Engine and Event Sound)
+            self._log_file_info()
             
             # 4. Branch by sound type
             if self.sound_type == "Engine Sound":
@@ -165,8 +164,8 @@ class ProcessingThread(QThread):
         """Prepare output folder"""
         try:
             output_folder = self.file_manager.ensure_output_folder_exists()
-            self.log_message.emit(f"Output folder ready: {os.path.basename(output_folder)}")
-            self.log_manager.add_log_entry(f"Output folder: {output_folder}")
+            self.log_message.emit(f"Output folder path: {output_folder}")
+            self.log_manager.add_log_entry(f"Output folder path: {output_folder}")
             return True
             
         except Exception as e:
@@ -178,7 +177,9 @@ class ProcessingThread(QThread):
         """Convert WAV files to FLAC and then to HEX data"""
         try:
             self.log_message.emit("\n" + "=" * LOG_WIDTH)
+            self.log_manager.add_log_entry(f"=" * LOG_WIDTH)
             self.log_message.emit("[ File Conversion ]")
+            self.log_manager.add_log_entry(f"[ File Conversion ]")
             self.log_message.emit("=" * LOG_WIDTH)
             
             self.hex_data_list = []
@@ -230,13 +231,13 @@ class ProcessingThread(QThread):
             
             # Log message
             self.log_message.emit(f"Converted successfully : {wav_file}")
-            self.log_manager.add_log_entry(f"Converted: {wav_file}")
+            self.log_manager.add_log_entry(f"Converted successfully: {wav_file}")
             
             return True
             
         except (AudioFileError, FlacConversionError) as e:
             self.log_message.emit(f"Conversion Failed : {wav_file} : {str(e)}")
-            self.log_manager.add_log_entry(f"Failed: {wav_file} - {str(e)}")
+            self.log_manager.add_log_entry(f"Conversion Failed: {wav_file} - {str(e)}")
             return False
         except Exception as e:
             self.log_message.emit(f"Unexpected error processing {wav_file}: {str(e)}")
@@ -250,23 +251,27 @@ class ProcessingThread(QThread):
         return address
     
     def _log_file_info(self):
-        """Output file info table to log"""
+        """Output file info table to log and save to CSV"""
         try:
             self.log_message.emit("\n" + "-" * LOG_WIDTH)
             self.log_message.emit(f"{'File Name':<50} | {'Start Address':>13} | {'Data Length':>11}")
+            self.log_manager.add_log_entry(f"{'File Name':<50} | {'Start Address':>13} | {'Data Length':>11}")
             self.log_message.emit("-" * LOG_WIDTH)
+            self.log_manager.add_log_entry(f"-" * LOG_WIDTH)
             
             for i, (wav_file, start_addr, hex_data) in enumerate(zip(self.wav_files, self.start_addresses, self.hex_data_list)):
                 file_name = os.path.basename(wav_file)
-                # If file name is too long, truncate and add "..."
-                if len(file_name) > 47:
-                    file_name = file_name[:44] + "..."
                 file_name_formatted = f"{file_name:<50}"
                 start_address_formatted = f"0x{start_addr:08X}"
                 data_length_formatted = f"0x{len(hex_data):08X}"
                 self.log_message.emit(f"{file_name_formatted} | {start_address_formatted:>13} | {data_length_formatted:>11}")
+                
+                # Save file info to CSV with '|' separator
+                file_info_message = f"{file_name} | {start_address_formatted} | {data_length_formatted}"
+                self.log_manager.add_log_entry(file_info_message)
             
             self.log_message.emit("-" * LOG_WIDTH)
+            self.log_manager.add_log_entry(f"-" * LOG_WIDTH)
             
         except Exception as e:
             self.log_message.emit(f"Error logging file info: {str(e)}")
@@ -275,9 +280,12 @@ class ProcessingThread(QThread):
         """Merge HEX data and save files"""
         try:
             self.log_message.emit("\n" + "=" * LOG_WIDTH)
+            self.log_manager.add_log_entry(f"=" * LOG_WIDTH)
             self.log_message.emit("[ File Generation ]")
+            self.log_manager.add_log_entry(f"[ File Generation ]")
             self.log_message.emit("=" * LOG_WIDTH)
-            
+            self.log_manager.add_log_entry(f"=" * LOG_WIDTH)
+
             # Process sound positions (engine sound only)
             sound_positions = self._get_sound_positions()
             
@@ -324,6 +332,7 @@ class ProcessingThread(QThread):
             # Save BIN file
             bin_filename = self.file_manager.save_bin_file(merged_hex)
             self.log_message.emit(f"Total data size: {total_flac_size:,} bytes")
+            self.log_manager.add_log_entry(f"Total data size: {total_flac_size:,} bytes")
             self.log_message.emit(f"Created BIN file: {bin_filename}")
             self.log_manager.add_log_entry(f"Created BIN: {bin_filename}")
             
@@ -376,6 +385,15 @@ class ProcessingThread(QThread):
             self.log_message.emit("[ File Generation ]")
             self.log_message.emit("=" * LOG_WIDTH)
             
+            # Update start addresses if they were changed in dialog
+            if updated_positions:
+                for i, position in enumerate(updated_positions):
+                    if i < len(self.start_addresses):
+                        try:
+                            self.start_addresses[i] = int(position, 16)
+                        except ValueError:
+                            pass  # Keep original address if conversion fails
+            
             # Merge with updated positions
             merged_hex = self.hex_merger.merge_hex_data_list(self.hex_data_list, updated_positions)
             
@@ -417,7 +435,7 @@ class AddressSettingDialog(QDialog):
         self.wav_files = wav_files
         self.start_addresses = start_addresses
         self.sound_positions = sound_positions
-        self.setWindowTitle("Engine Sound Address Settings")
+        self.setWindowTitle("Engine Sound Channel Mappings")
         self.setModal(True)
         
         self._setup_ui()
@@ -436,16 +454,13 @@ class AddressSettingDialog(QDialog):
         fixed_label_width = 350
         self.setMinimumWidth(fixed_label_width + 30)  # 라벨+여유
         
-        # Description label
-        desc_label = QLabel("Set the starting address for each sound file:")
-        desc_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
-        layout.addWidget(desc_label, 0)
+
         
         # Create table
         table = QTableWidget()
         table.setColumnCount(2)
         table.setRowCount(len(self.wav_files))
-        table.setHorizontalHeaderLabels(["WAV File", "Start Address"])
+        table.setHorizontalHeaderLabels(["Sound File", "Memory Address"])
         
         # Set column widths
         table.setColumnWidth(0, UIConstants.WAV_FILE_COLUMN_WIDTH)
@@ -474,15 +489,15 @@ class AddressSettingDialog(QDialog):
         
         # Engine Sound Positions info
         if self.sound_positions:
-            positions_group = QGroupBox("Engine Sound Positions")
+            positions_group = QGroupBox("Sound Channel References")
             positions_layout = QGridLayout()
             positions_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
             
             position_labels = [
-                "Sound F1 position:", "Sound F2 position:", "Sound F3 position:",
-                "Sound S1 position:", "Sound S2 position:", "Sound S3 position:",
-                "Sound C1 position:", "Sound C2 position:",
-                "Sound R1 position:", "Sound R2 position:"
+                "Channel F1:", "Channel F2:", "Channel F3:",
+                "Channel S1:", "Channel S2:", "Channel S3:",
+                "Channel C1:", "Channel C2:",
+                "Channel R1:", "Channel R2:"
             ]
             
             self.position_edits = []  # List to store edited positions
@@ -499,7 +514,7 @@ class AddressSettingDialog(QDialog):
             layout.addWidget(positions_group, 0)  # stretch=0
         
         # Apply button
-        apply_button = QPushButton("Apply")
+        apply_button = QPushButton("OK")
         apply_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         apply_button.clicked.connect(self.accept)
         layout.addWidget(apply_button, 0)  # stretch=0
@@ -511,7 +526,7 @@ class AddressSettingDialog(QDialog):
         return [edit.text().upper() for edit in self.position_edits] if hasattr(self, 'position_edits') else []
     
     def accept(self):
-        """On Apply button click"""
+        """On OK button click"""
         # Output Engine Sound Position info to log
         if hasattr(self, 'position_edits'):
             # List for address matching check
@@ -519,10 +534,10 @@ class AddressSettingDialog(QDialog):
             
             # Output position labels and values
             position_labels = [
-                "Sound F1 ", "Sound F2 ", "Sound F3 ",
-                "Sound S1 ", "Sound S2 ", "Sound S3 ",
-                "Sound C1 ", "Sound C2 ",
-                "Sound R1 ", "Sound R2 "
+                "Channel F1 ", "Channel F2 ", "Channel F3 ",
+                "Channel S1 ", "Channel S2 ", "Channel S3 ",
+                "Channel C1 ", "Channel C2 ",
+                "Channel R1 ", "Channel R2 "
             ]
             
             for i, (label, edit) in enumerate(zip(position_labels, self.position_edits)):

@@ -1,7 +1,7 @@
 """
 =========================================================================================
 📌 File:         main_window.py
-📌 Description:  Main window class for AVAS40 WavConverter (refactored)
+📌 Description:  Main window class for AVAS40 WavGenerator (refactored)
 📌 Author:       Geunwoo Lee
 📌 Date:         2025-01-15
 📌 Version:      1.00
@@ -59,7 +59,7 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"AVAS40 Sound Converter v{TOOL_VERSION}")
+        self.setWindowTitle(f"AVAS40 Sound Generator v{TOOL_VERSION}")
         self.setGeometry(100, 100, UIConstants.MAIN_WINDOW_WIDTH, UIConstants.MAIN_WINDOW_HEIGHT)
         
         # Enable drag and drop
@@ -105,7 +105,7 @@ class MainWindow(QMainWindow):
     
     def _create_input_group(self) -> QGroupBox:
         """Create input folder selection group"""
-        input_group = QGroupBox("Input Settings")
+        input_group = QGroupBox("Folder Selection")
         input_layout = QGridLayout()
         
         self.input_folder_edit = QLineEdit()
@@ -125,7 +125,7 @@ class MainWindow(QMainWindow):
     
     def _create_settings_group(self) -> QGroupBox:
         """Create settings group"""
-        settings_group = QGroupBox("Conversion Settings")
+        settings_group = QGroupBox("FLAC Encoding Settings")
         settings_layout = QGridLayout()
         
         # Compression level
@@ -179,7 +179,7 @@ class MainWindow(QMainWindow):
     def _create_button_layout(self) -> QHBoxLayout:
         """Create button layout"""
         button_layout = QHBoxLayout()
-        self.start_button = QPushButton("Start Processing")
+        self.start_button = QPushButton("Generate Files")
         self.start_button.clicked.connect(self.start_processing)
         self.save_button = QPushButton("Save Log")
         self.save_button.clicked.connect(self.save_log)
@@ -218,8 +218,19 @@ class MainWindow(QMainWindow):
         
     def browse_folder(self):
         """Open folder selection dialog"""
-        folder = QFileDialog.getExistingDirectory(self, "Select Folder with WAV files")
-        if folder:
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle("Select Folder with WAV Files")
+        dialog.setFileMode(QFileDialog.DirectoryOnly)
+        dialog.setOption(QFileDialog.ShowDirsOnly, True)
+        dialog.setOption(QFileDialog.DontResolveSymlinks, True)
+        
+        # Set button texts to English
+        dialog.setLabelText(QFileDialog.FileName, "Folder:")
+        dialog.setLabelText(QFileDialog.Accept, "Select Folder")
+        dialog.setLabelText(QFileDialog.Reject, "Cancel")
+        
+        if dialog.exec_() == QFileDialog.Accepted:
+            folder = dialog.selectedFiles()[0]
             self.input_folder_edit.setText(folder)
     
     def setup_menu_bar(self):

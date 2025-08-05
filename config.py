@@ -1,7 +1,7 @@
 """
 =========================================================================================
 📌 File:         config.py
-📌 Description:  Settings management module for AVAS40 WavConverter
+📌 Description:  Settings management module for AVAS40 WavGenerator
 📌 Author:       Geunwoo Lee
 📌 Date:         2025-01-15
 📌 Version:      1.00

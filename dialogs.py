@@ -1,7 +1,7 @@
 """
 =========================================================================================
 📌 File:         dialogs.py
-📌 Description:  Dialog classes for AVAS40 WavConverter (refactored)
+📌 Description:  Dialog classes for AVAS40 WavGenerator (refactored)
 📌 Author:       Geunwoo Lee
 📌 Date:         2025-01-15
 📌 Version:      1.00
@@ -139,13 +139,23 @@ class SettingsDialog(QDialog):
     def browse_output_path(self):
         """Select output path"""
         current_path = self.output_path_edit.text()
-        folder = QFileDialog.getExistingDirectory(
-            self, 
-            "Select Output Folder", 
-            current_path,
-            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
-        )
-        if folder:
+        
+        dialog = QFileDialog(self)
+        dialog.setWindowTitle("Select Output Folder")
+        dialog.setFileMode(QFileDialog.DirectoryOnly)
+        dialog.setOption(QFileDialog.ShowDirsOnly, True)
+        dialog.setOption(QFileDialog.DontResolveSymlinks, True)
+        
+        # Set button texts to English
+        dialog.setLabelText(QFileDialog.FileName, "Folder:")
+        dialog.setLabelText(QFileDialog.Accept, "Select Folder")
+        dialog.setLabelText(QFileDialog.Reject, "Cancel")
+        
+        if current_path:
+            dialog.setDirectory(current_path)
+        
+        if dialog.exec_() == QFileDialog.Accepted:
+            folder = dialog.selectedFiles()[0]
             self.output_path_edit.setText(folder)
             self.update_current_path_display()
     

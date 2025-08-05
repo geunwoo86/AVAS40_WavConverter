@@ -1,7 +1,7 @@
 """
 =========================================================================================
 📌 File:         audio_processor.py
-📌 Description:  Audio processing module for AVAS40 WavConverter
+📌 Description:  Audio processing module for AVAS40 WavGenerator
 📌 Author:       Geunwoo Lee
 📌 Date:         2025-01-15
 📌 Version:      1.00

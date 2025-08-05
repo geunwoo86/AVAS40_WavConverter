@@ -2,13 +2,13 @@
 """
 =========================================================================================
 📌 File:         AVAS40_Sound_Converter.py
-📌 Description:  Compatibility entry point for AVAS40 WAV to Binary Converter
+📌 Description:  Compatibility entry point for AVAS40 WAV to Binary Generator
 📌 Author:       Geunwoo Lee
 📌 Date:         2025-01-15 (modularization update)
 📌 Version:      1.00
 =========================================================================================
 📌 Main Features:
-    - Maintains compatibility with legacy filename (AVAS40_WavConverter.py → AVAS40_Sound_Converter.py)
+    - Maintains compatibility with legacy filename (AVAS40_WavGenerator.py → AVAS40_Sound_Generator.py)
     - Provides same functionality as main.py
     - Imports all modules for full feature access
     - Compatibility interface for legacy users
@@ -18,7 +18,7 @@
     - 2025-01-15: Refactored to modular structure
     
 📌 How to Run:
-    - Direct: python AVAS40_Sound_Converter.py
+    - Direct: python AVAS40_Sound_Generator.py
     - Recommended: python main.py
     - All legacy features available
     
